@@ -11,4 +11,5 @@ pub enum Token {
     Plus,
     Minus,
     Multiply,
+    EOF,
 }
