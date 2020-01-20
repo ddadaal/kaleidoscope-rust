@@ -1,7 +1,7 @@
 use super::token::Token;
 use crate::lexer::input::Input;
 use crate::lexer::token::Token::*;
-use crate::{or_break, or_return};
+use crate::or_return;
 
 #[derive(Debug, PartialEq)]
 pub enum LexerError {
@@ -42,14 +42,13 @@ impl<I: Input> Lexer<I> {
             '*' => Ok(Multiply),
             // handle comment by getting until the eol
             '#' => {
-                loop {
-                    c = or_break!(self.input.curr_char());
-                    // Got \n, line has end
-                    // Eat \n and continue parsing
+                while {
+                    self.input.curr_char().map_or(false, |x| {
+                        c = x;
+                        c != '\n'
+                    })
+                } {
                     self.input.advance();
-                    if c == '\n' {
-                        break;
-                    }
                 }
                 self.read()
             }
@@ -179,7 +178,21 @@ mod tests {
     #[test]
     fn malformed_numbers() {
         expect_err("1.4.2", LexerError::NumberNotValid("1.4.2".into()));
-        // expect_err(".4.2", LexerError::NumberNotValid(".4.2".into()));
+        expect_err(".4.2", LexerError::NumberNotValid(".4.2".into()));
+    }
+
+    #[test]
+    fn comments() {
+        assert_eq!(
+            read_all(
+                "
+            123 #12312321ojff
+            def
+            "
+            ),
+            vec![Number(123.0), Def]
+        );
+        assert_eq!(read_all("123 #12312321ojff"), vec![Number(123.0)]);
     }
 
     fn read_all(input: &str) -> Vec<Token> {
