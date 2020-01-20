@@ -83,7 +83,7 @@ mod tests {
     #[test]
     fn zero_len_string_should_return_none() {
         let s = "";
-        let mut input: StringInput = s.into();
+        let input: StringInput = s.into();
 
         assert_eq!(None, input.curr_char());
         assert_eq!(None, input.peek_char());
