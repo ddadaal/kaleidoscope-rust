@@ -1,7 +1,8 @@
+use super::input::StringInput;
 use super::token::Token;
 use crate::lexer::input::Input;
+use crate::lexer::token::Token::*;
 use crate::{or_break, or_return};
-
 pub enum LexerError {
     NumberNotValid(String),
     NotRecognized(char),
@@ -29,13 +30,13 @@ impl<I: Input> Lexer<I> {
         }
         match c {
             // Simple cases
-            '(' => Ok(Some(Token::OpeningParenthesis)),
-            ')' => Ok(Some(Token::ClosingParenthesis)),
-            ';' => Ok(Some(Token::Delimiter)),
-            ',' => Ok(Some(Token::Comma)),
-            '+' => Ok(Some(Token::Plus)),
-            '-' => Ok(Some(Token::Minus)),
-            '*' => Ok(Some(Token::Multiply)),
+            '(' => Ok(Some(OpeningParenthesis)),
+            ')' => Ok(Some(ClosingParenthesis)),
+            ';' => Ok(Some(Delimiter)),
+            ',' => Ok(Some(Comma)),
+            '+' => Ok(Some(Plus)),
+            '-' => Ok(Some(Minus)),
+            '*' => Ok(Some(Multiply)),
             // handle comment by getting until the eol
             '#' => {
                 loop {
@@ -62,9 +63,9 @@ impl<I: Input> Lexer<I> {
                     }
                 }
                 Ok(Some(match ident.as_ref() {
-                    "def" => Token::Def,
-                    "extern" => Token::Extern,
-                    _ => Token::Identifier(ident),
+                    "def" => Def,
+                    "extern" => Extern,
+                    _ => Identifier(ident),
                 }))
             }
             // Get a digit, it may be a digit.
@@ -87,22 +88,10 @@ impl<I: Input> Lexer<I> {
                     }
                 }
                 val.parse::<f64>()
-                    .map(|x| Some(Token::Number(x)))
+                    .map(|x| Some(Number(x)))
                     .map_err(|_| LexerError::NumberNotValid(val))
             }
             _ => Err(LexerError::NotRecognized(c)),
-        }
-    }
-}
-
-impl<I: Input> Iterator for Lexer<I> {
-    type Item = Result<Token, LexerError>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        match self.read() {
-            Ok(Some(x)) => Some(Ok(x)),
-            Ok(None) => None,
-            Err(err) => Some(Err(err)),
         }
     }
 }
@@ -112,5 +101,57 @@ mod tests {
     use super::*;
 
     #[test]
-    fn string_input_should_work() {}
+    fn identifier() {
+        assert_eq!(read_all("ident"), vec![Identifier("ident".into())]);
+        assert_eq!(read_all("ident123"), vec![Identifier("ident123".into())]);
+        assert_eq!(
+            read_all("ident123 als"),
+            vec!["ident123", "als"]
+                .into_iter()
+                .map(|x| Identifier(x.to_string()))
+                .collect::<Vec<Token>>()
+        );
+    }
+
+    #[test]
+    fn keywords_and_symbols() {
+        assert_eq!(
+            read_all("def extern ; ( ) , + - *"),
+            vec![
+                Def,
+                Extern,
+                Delimiter,
+                OpeningParenthesis,
+                ClosingParenthesis,
+                Comma,
+                Plus,
+                Minus,
+                Multiply
+            ]
+        );
+    }
+
+    #[test]
+    fn numbers() {
+        assert_eq!(
+            read_all("123 .4 1234. 12345.6"),
+            vec![123.0, 0.4, 1234.0, 12345.6]
+                .into_iter()
+                .map(|x| Number(x))
+                .collect::<Vec<Token>>()
+        );
+    }
+
+    fn read_all(input: &str) -> Vec<Token> {
+        let mut lexer = Lexer::new(StringInput::new(input));
+        let mut result: Vec<Token> = Vec::new();
+        while let Ok(res) = lexer.read() {
+            match res {
+                Some(x) => result.push(x),
+                None => break,
+            }
+        }
+
+        result
+    }
 }

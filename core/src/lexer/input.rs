@@ -10,7 +10,7 @@ pub trait Input: Clone {
 }
 
 #[derive(Clone)]
-struct StringInput<'a> {
+pub struct StringInput<'a> {
     iter: std::str::Chars<'a>,
     curr: Option<char>,
     next: Option<char>,
