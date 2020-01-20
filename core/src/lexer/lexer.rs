@@ -9,7 +9,7 @@ pub enum LexerError {
     NotRecognized(char),
 }
 
-struct Lexer<I: Input> {
+pub struct Lexer<I: Input> {
     /// The source of input
     input: I,
 }
@@ -37,9 +37,7 @@ impl<I: Input> Lexer<I> {
             ')' => Ok(ClosingParenthesis),
             ';' => Ok(Delimiter),
             ',' => Ok(Comma),
-            '+' => Ok(Plus),
-            '-' => Ok(Minus),
-            '*' => Ok(Multiply),
+            '+' | '-' | '*' => Ok(BinOp(c)),
             // handle comment by getting until the eol
             '#' => {
                 while {
@@ -122,9 +120,9 @@ mod tests {
                 OpeningParenthesis,
                 ClosingParenthesis,
                 Comma,
-                Plus,
-                Minus,
-                Multiply
+                BinOp('+'),
+                BinOp('-'),
+                BinOp('*'),
             ]
         );
     }
@@ -164,11 +162,11 @@ mod tests {
                 Identifier("b".into()),
                 ClosingParenthesis,
                 Identifier("a".into()),
-                Plus,
+                BinOp('+'),
                 Number(4.0),
-                Multiply,
+                BinOp('*'),
                 Identifier("b".into()),
-                Minus,
+                BinOp('-'),
                 Number(3.2),
                 Delimiter,
             ]

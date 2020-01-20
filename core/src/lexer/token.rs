@@ -8,8 +8,6 @@ pub enum Token {
     Comma,
     Identifier(String),
     Number(f64),
-    Plus,
-    Minus,
-    Multiply,
+    BinOp(char),
     EOF,
 }
