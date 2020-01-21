@@ -90,7 +90,6 @@ impl<I: Iterator<Item = Token>> Parser<I> {
                 }),
             };
             program.push(node);
-            self.buffer.advance();
         }
     }
 
@@ -111,7 +110,6 @@ impl<I: Iterator<Item = Token>> Parser<I> {
 
     fn parse_function(&mut self) -> ParseResult<Function> {
         self.buffer.advance(); // eat def
-        println!("eat def");
         let prototype = self.parse_prototype()?;
 
         let body = self.parse_expression()?;
@@ -134,7 +132,6 @@ impl<I: Iterator<Item = Token>> Parser<I> {
         while let Identifier(arg_name) = get_curr!(self, "expect identifier or )") {
             args.push(arg_name.to_string());
             self.buffer.advance();
-            println!("{:?}", args);
         }
 
         // expect )
@@ -274,17 +271,14 @@ mod tests {
         let program = "
          def fun1(a b)
          a+b*e-d
+         a+b
+         extern sin(x)
          ";
         let lexer = Lexer::new(program.chars());
 
-        let tokens = lexer
-            .take_while(|x| x.is_ok())
-            .map(|x| x.unwrap())
-            .collect::<Vec<Token>>();
+        let tokens = lexer.take_while(|x| x.is_ok()).map(|x| x.unwrap());
 
-        println!("{:?}", tokens);
-
-        let mut parser = Parser::new(tokens.into_iter());
+        let mut parser = Parser::new(tokens);
 
         let ast = parser.parse();
 
