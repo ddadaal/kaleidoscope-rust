@@ -1,3 +1,5 @@
-pub mod input;
-pub mod lexer;
-pub mod token;
+mod lexer;
+mod token;
+
+pub use lexer::*;
+pub use token::Token;

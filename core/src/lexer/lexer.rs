@@ -1,7 +1,7 @@
 use super::token::Token;
-use crate::lexer::input::Input;
 use crate::lexer::token::Token::*;
 use crate::or_return;
+use crate::util::buffer::Buffer;
 
 #[derive(Debug, PartialEq)]
 pub enum LexerError {
@@ -9,59 +9,71 @@ pub enum LexerError {
     NotRecognized(char),
 }
 
-pub struct Lexer<I: Input> {
+pub struct Lexer<I: Iterator<Item = char>> {
     /// The source of input
-    input: I,
+    buffer: Buffer<char, I>,
 }
 
 pub type LexerResult = Result<Token, LexerError>;
 
-impl<I: Input> Lexer<I> {
-    pub fn new(input: I) -> Self {
-        Lexer { input }
+impl<I: Iterator<Item = char>> Lexer<I> {
+    pub fn new(char_iter: I) -> Self {
+        Lexer {
+            buffer: Buffer::new(char_iter),
+        }
     }
-    pub fn read(&mut self) -> LexerResult {
+}
+
+impl<I: Iterator<Item = char>> Iterator for Lexer<I> {
+    type Item = Result<Token, LexerError>;
+
+    fn next(&mut self) -> Option<Self::Item> {
         // Read a char
-        // If no more input, return Ok(None)
-        let mut c = or_return!(self.input.curr_char(), Ok(EOF));
+        // If no more input, return None
+        let mut c: char = *or_return!(self.buffer.curr(), None);
+
         // Skip whitespaces
         while c.is_whitespace() {
-            c = or_return!(self.input.advance(), Ok(EOF));
+            self.buffer.advance();
+            c = *or_return!(self.buffer.curr(), None);
         }
-        // eat current.
-        self.input.advance();
-        // Now iter is at the next char
-        match c {
+
+        // eat current
+        self.buffer.advance();
+
+        // handle comment by getting until eol
+        if c == '#' {
+            while {
+                self.buffer.curr().map_or(false, |x| {
+                    c = *x;
+                    c != '\n'
+                })
+            } {
+                self.buffer.advance();
+            }
+            return self.next();
+        }
+
+        // handle all other case
+        Some(match c {
             // Simple cases
             '(' => Ok(OpeningParenthesis),
             ')' => Ok(ClosingParenthesis),
             ';' => Ok(Delimiter),
             ',' => Ok(Comma),
             '+' | '-' | '*' => Ok(BinOp(c)),
-            // handle comment by getting until the eol
-            '#' => {
-                while {
-                    self.input.curr_char().map_or(false, |x| {
-                        c = x;
-                        c != '\n'
-                    })
-                } {
-                    self.input.advance();
-                }
-                self.read()
-            }
             // Get a letter, it may be a identifier, or a keyword
             _ if c.is_alphabetic() => {
                 let mut ident = c.to_string();
                 // Collect all alphanumeric chars
                 while {
-                    self.input.curr_char().map_or(false, |x| {
-                        c = x;
+                    self.buffer.curr().map_or(false, |x| {
+                        c = *x;
                         x.is_alphanumeric()
                     })
                 } {
                     ident.push(c);
-                    self.input.advance();
+                    self.buffer.advance();
                 }
                 Ok(match ident.as_ref() {
                     "def" => Def,
@@ -74,12 +86,12 @@ impl<I: Input> Lexer<I> {
                 let mut val = c.to_string();
                 // Collect all numbers and at most one dot (.).
                 while {
-                    self.input.curr_char().map_or(false, |x| {
-                        c = x;
+                    self.buffer.curr().map_or(false, |x| {
+                        c = *x;
                         c == '.' || c.is_ascii_digit()
                     })
                 } {
-                    self.input.advance();
+                    self.buffer.advance();
                     val.push(c);
                 }
                 val.parse::<f64>()
@@ -87,25 +99,36 @@ impl<I: Input> Lexer<I> {
                     .map_err(|_| LexerError::NumberNotValid(val))
             }
             _ => Err(LexerError::NotRecognized(c)),
-        }
+        })
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::lexer::input::StringInput;
+
+    macro_rules! tokens {
+        ( $( $x:expr),*) => {
+            tokens!($($x,)*)
+        };
+        ( $( $x:expr,)* ) => {
+            {
+                let mut temp_vec = Vec::new();
+                $(
+                    temp_vec.push(Ok($x));
+                )*
+                temp_vec
+            }
+        };
+    }
 
     #[test]
     fn identifier() {
-        assert_eq!(read_all("ident"), vec![Identifier("ident".into())]);
-        assert_eq!(read_all("ident123"), vec![Identifier("ident123".into())]);
+        assert_eq!(read_all("ident"), tokens![Identifier("ident".into())]);
+        assert_eq!(read_all("ident123"), tokens![Identifier("ident123".into())]);
         assert_eq!(
             read_all("ident123 als"),
-            vec!["ident123", "als"]
-                .into_iter()
-                .map(|x| Identifier(x.to_string()))
-                .collect::<Vec<Token>>()
+            tokens![Identifier("ident123".into()), Identifier("als".into())]
         );
     }
 
@@ -113,7 +136,7 @@ mod tests {
     fn keywords_and_symbols() {
         assert_eq!(
             read_all("def extern ; ( ) , + - *"),
-            vec![
+            tokens![
                 Def,
                 Extern,
                 Delimiter,
@@ -131,10 +154,13 @@ mod tests {
     fn numbers() {
         assert_eq!(
             read_all("123 12 .4 1234. 12345.6"),
-            vec![123.0, 12.0, 0.4, 1234.0, 12345.6]
-                .into_iter()
-                .map(|x| Number(x))
-                .collect::<Vec<Token>>()
+            tokens![
+                Number(123.0),
+                Number(12.0),
+                Number(0.4),
+                Number(1234.0),
+                Number(12345.6),
+            ]
         );
     }
 
@@ -148,7 +174,7 @@ mod tests {
                 a+4*b-3.2;
             "
             ),
-            vec![
+            tokens![
                 Extern,
                 Identifier("sin".into()),
                 OpeningParenthesis,
@@ -175,8 +201,14 @@ mod tests {
 
     #[test]
     fn malformed_numbers() {
-        expect_err("1.4.2", LexerError::NumberNotValid("1.4.2".into()));
-        expect_err(".4.2", LexerError::NumberNotValid(".4.2".into()));
+        assert_eq!(
+            read_all("1.4.2"),
+            vec![Err(LexerError::NumberNotValid("1.4.2".into()))]
+        );
+        assert_eq!(
+            read_all(".4.2"),
+            vec![Err(LexerError::NumberNotValid(".4.2".into()))]
+        );
     }
 
     #[test]
@@ -188,36 +220,12 @@ mod tests {
             def
             "
             ),
-            vec![Number(123.0), Def]
+            tokens![Number(123.0), Def,]
         );
-        assert_eq!(read_all("123 #12312321ojff"), vec![Number(123.0)]);
+        assert_eq!(read_all("123 #12312321ojff"), tokens![Number(123.0),]);
     }
 
-    fn read_all(input: &str) -> Vec<Token> {
-        let mut lexer = Lexer::new(StringInput::new(input));
-        let mut result: Vec<Token> = Vec::new();
-        while let Ok(res) = lexer.read() {
-            match res {
-                EOF => break,
-                _ => result.push(res),
-            }
-        }
-
-        if let Err(err) = lexer.read() {
-            print!("Err: {:?}", err);
-        }
-
-        result
-    }
-
-    fn expect_err(input: &str, err: LexerError) {
-        let mut lexer = Lexer::new(StringInput::new(input));
-        loop {
-            let result = lexer.read();
-            if result.is_err() {
-                assert_eq!(Err(err), result);
-                break;
-            }
-        }
+    fn read_all(input: &str) -> Vec<Result<Token, LexerError>> {
+        Lexer::new(input.chars()).collect()
     }
 }

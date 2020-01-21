@@ -9,5 +9,4 @@ pub enum Token {
     Identifier(String),
     Number(f64),
     BinOp(char),
-    EOF,
 }
