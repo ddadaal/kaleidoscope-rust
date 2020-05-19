@@ -14,7 +14,23 @@ Building LLVM's official [Kaleidoscope](https://llvm.org/docs/tutorial/index.htm
 
 ## Dev
 
-Make sure LLVM is installed locally.
+Currently it uses LLVM 10.
+
+[llvmenv](https://github.com/termoshtt/llvmenv) is used to manage llvm builds.
+
+The quickest to get started in Linux is do the following. You may consult llvmenv's documentations to config llvm environments.
+
+```bash
+# 1. Install llvm from your distro's package manager
+#    Arch's pacman is used here as an example
+sudo pacman -S llvm
+
+# 2. Install llvmenv through cargo
+cargo install llvmenv
+
+# 3. Set the system executable as the llvm to be used
+llvmenv global system
+```
 
 Run unit tests:
 
