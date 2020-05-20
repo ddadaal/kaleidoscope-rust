@@ -1,12 +1,16 @@
 use crate::parser::nodes::Expression;
-use crate::parser::nodes::Program;
+use crate::parser::nodes::{Function, Program, Prototype};
 use inkwell::builder::Builder;
 use inkwell::context::Context;
 use inkwell::module::Module;
+use inkwell::types::BasicTypeEnum;
 use inkwell::values::AnyValueEnum;
 use inkwell::values::BasicValueEnum;
 use inkwell::values::FloatValue;
-use inkwell::{values::PointerValue, FloatPredicate};
+use inkwell::{
+    values::{BasicValue, FunctionValue, PointerValue},
+    FloatPredicate,
+};
 use std::collections::HashMap;
 
 struct CodegenContext<'ctx> {
@@ -19,7 +23,7 @@ struct CodegenContext<'ctx> {
 impl<'ctx> CodegenContext<'ctx> {
     /// Generate code of an expression
     /// All expressions have return value of float
-    fn codegen_expr(&self, expr: &Expression) -> Result<FloatValue<'ctx>, String> {
+    fn compile_expr(&self, expr: &Expression) -> Result<FloatValue<'ctx>, String> {
         match expr {
             Expression::NumberExpr(num) => Ok(self.context.f64_type().const_float(*num)),
             Expression::VariableExpr(ref var) => self
@@ -28,8 +32,8 @@ impl<'ctx> CodegenContext<'ctx> {
                 .map(|x| self.builder.build_load(*x, var).into_float_value())
                 .ok_or(format!("Unknown variable name: {}", var)),
             Expression::BinaryExpr(op, left, right) => {
-                let lhs = self.codegen_expr(left)?;
-                let rhs = self.codegen_expr(right)?;
+                let lhs = self.compile_expr(left)?;
+                let rhs = self.compile_expr(right)?;
                 match op {
                     '+' => Ok(self.builder.build_float_add(lhs, rhs, "tmpadd")),
                     '-' => Ok(self.builder.build_float_sub(lhs, rhs, "tmpsub")),
@@ -86,7 +90,7 @@ impl<'ctx> CodegenContext<'ctx> {
                 let mut parsed_args: Vec<BasicValueEnum> = Vec::with_capacity(args.len());
 
                 for arg in args {
-                    parsed_args.push(self.codegen_expr(arg)?.into());
+                    parsed_args.push(self.compile_expr(arg)?.into());
                 }
 
                 self.builder
@@ -96,6 +100,74 @@ impl<'ctx> CodegenContext<'ctx> {
                     .map(|x| x.into_float_value())
                     .ok_or("Invalid call.".into())
             }
+        }
+    }
+
+    /// Generate code of proto, convert a function prototype to a FunctionValue
+    fn compile_proto(&self, proto: &Prototype) -> Result<FunctionValue<'ctx>, String> {
+        let ret_type = self.context.f32_type();
+        let arg_types: Vec<BasicTypeEnum> = vec![ret_type.into(); proto.args.len()];
+        let arg_types_slice = arg_types.as_slice();
+
+        let fn_type = self.context.f64_type().fn_type(arg_types_slice, false);
+        let fn_val = self.module.add_function(&proto.name, fn_type, None);
+
+        // set argument names
+        for (i, arg) in fn_val.get_param_iter().enumerate() {
+            arg.into_float_value().set_name(&proto.args[i]);
+        }
+
+        Ok(fn_val)
+    }
+
+    /// Creates a new stack allocation instruction
+    fn create_entry_block_alloca(&self, fun_val: &FunctionValue, name: &str) -> PointerValue<'ctx> {
+        let builder = self.context.create_builder();
+
+        let entry = fun_val.get_first_basic_block().unwrap();
+
+        match entry.get_first_instruction() {
+            Some(first_instr) => builder.position_before(&first_instr),
+            None => builder.position_at_end(entry),
+        }
+
+        builder.build_alloca(self.context.f64_type(), name)
+    }
+
+    fn compile_func(&mut self, func: &Function) -> Result<FunctionValue, String> {
+        // if the FunctionValue does not exist, compile it.
+        let fun_val = match self.module.get_function(&func.prototype.name) {
+            Some(func) => func,
+            None => self.compile_proto(&func.prototype)?,
+        };
+
+        let basic_block = self.context.append_basic_block(fun_val, "entry");
+        self.builder.position_at_end(basic_block);
+
+        // record the functioin arguments in the named_values
+        self.named_values.clear();
+        for (i, arg) in fun_val.get_param_iter().enumerate() {
+            let arg_name = &func.prototype.args[i];
+            let alloca = self.create_entry_block_alloca(&fun_val, arg_name);
+
+            self.builder.build_store(alloca, arg);
+
+            self.named_values.insert(arg_name.into(), alloca);
+        }
+
+        let body = self.compile_expr(&func.body)?;
+        self.builder.build_return(Some(&body));
+
+        if fun_val.verify(true) {
+            Ok(fun_val)
+        } else {
+            unsafe {
+                fun_val.delete();
+            }
+            Err(format!(
+                "Generated function {} verification failed.",
+                func.prototype.name
+            ))
         }
     }
 }
