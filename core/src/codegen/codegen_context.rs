@@ -21,6 +21,15 @@ struct CodegenContext<'ctx> {
 }
 
 impl<'ctx> CodegenContext<'ctx> {
+    pub fn new(context: &'ctx Context, module_name: &str) -> Self {
+        CodegenContext {
+            context,
+            module: context.create_module(module_name),
+            builder: context.create_builder(),
+            named_values: HashMap::new(),
+        }
+    }
+
     /// Generate code of an expression
     /// All expressions have return value of float
     fn compile_expr(&self, expr: &Expression) -> Result<FloatValue<'ctx>, String> {
@@ -105,7 +114,7 @@ impl<'ctx> CodegenContext<'ctx> {
 
     /// Generate code of proto, convert a function prototype to a FunctionValue
     fn compile_proto(&self, proto: &Prototype) -> Result<FunctionValue<'ctx>, String> {
-        let ret_type = self.context.f32_type();
+        let ret_type = self.context.f64_type();
         let arg_types: Vec<BasicTypeEnum> = vec![ret_type.into(); proto.args.len()];
         let arg_types_slice = arg_types.as_slice();
 
@@ -169,5 +178,31 @@ impl<'ctx> CodegenContext<'ctx> {
                 func.prototype.name
             ))
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn compile_proto() {
+        let context = Context::create();
+        let cc = CodegenContext::new(&context, "test");
+
+        let test_name = "test_func";
+
+        let proto = Prototype {
+            name: test_name.into(),
+            args: vec!["arg1".into(), "arg2".into()],
+        };
+
+        let compiled_proto = cc.compile_proto(&proto).unwrap();
+
+        println!("{:?}", compiled_proto);
+        assert_eq!(
+            test_name.to_string(),
+            compiled_proto.get_name().to_str().unwrap()
+        );
     }
 }
