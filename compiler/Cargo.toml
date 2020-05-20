@@ -1,5 +1,5 @@
 [package]
-name = "kaleidoscope-rust-core"
+name = "compiler"
 version = "0.1.0"
 authors = ["Chen Junda <ddadaal@outlook.com>"]
 edition = "2018"

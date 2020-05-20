@@ -40,6 +40,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "compiler"
+version = "0.1.0"
+dependencies = [
+ "inkwell 0.1.0 (git+https://github.com/TheDan64/inkwell?branch=llvm10-0)",
+ "phf 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "either"
 version = "1.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -76,21 +84,6 @@ dependencies = [
  "proc-macro2 1.0.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "quote 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "syn 1.0.14 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "kaleidoscope-rust-core"
-version = "0.1.0"
-dependencies = [
- "inkwell 0.1.0 (git+https://github.com/TheDan64/inkwell?branch=llvm10-0)",
- "phf 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "kaleidoscope-rust-repl"
-version = "0.1.0"
-dependencies = [
- "kaleidoscope-rust-core 0.1.0",
 ]
 
 [[package]]
@@ -292,6 +285,13 @@ dependencies = [
 name = "regex-syntax"
 version = "0.6.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "repl"
+version = "0.1.0"
+dependencies = [
+ "compiler 0.1.0",
+]
 
 [[package]]
 name = "scopeguard"
