@@ -20,7 +20,7 @@ fn get_binop_precedences(binop: char) -> ParseResult<i8> {
 }
 
 #[derive(Debug)]
-struct ParseError(Option<Token>, String);
+pub struct ParseError(Option<Token>, String);
 
 impl ParseError {
     fn new(token: Option<Token>, message: &str) -> Self {
@@ -56,7 +56,7 @@ macro_rules! extract {
 
 type ParseResult<T> = Result<T, ParseError>;
 
-struct Parser<I: Iterator<Item = Token>> {
+pub struct Parser<I: Iterator<Item = Token>> {
     buffer: Buffer<Token, I>,
 }
 
@@ -68,29 +68,24 @@ impl<I: Iterator<Item = Token>> Parser<I> {
     }
 
     /// program := []
-    pub fn parse(&mut self) -> ParseResult<Program> {
-        let mut program: Program = Vec::new();
-
-        loop {
-            let token = or_return!(self.buffer.curr(), Ok(program));
-            let mut anonymous_fun_count = 0;
-            let node: ASTNode = match token {
-                Def => ASTNode::FunctionNode(self.parse_function()?),
-                Extern => ASTNode::ExternNode(self.parse_extern()?),
-                Delimiter => continue,
-                _ => ASTNode::FunctionNode(Function {
-                    prototype: Prototype {
-                        name: format!("_anonymous_{}", {
-                            anonymous_fun_count += 1;
-                            anonymous_fun_count
-                        }),
-                        args: vec![],
-                    },
-                    body: self.parse_expression()?,
-                }),
-            };
-            program.push(node);
-        }
+    pub fn parse(&mut self) -> ParseResult<ASTNode> {
+        let token = or_return!(self.buffer.curr(), Ok(ASTNode::EOF));
+        let mut anonymous_fun_count = 0;
+        Ok(match token {
+            Def => ASTNode::FunctionNode(self.parse_function()?),
+            Extern => ASTNode::ExternNode(self.parse_extern()?),
+            Delimiter => ASTNode::Delimiter,
+            _ => ASTNode::FunctionNode(Function {
+                prototype: Prototype {
+                    name: format!("_anonymous_{}", {
+                        anonymous_fun_count += 1;
+                        anonymous_fun_count
+                    }),
+                    args: vec![],
+                },
+                body: self.parse_expression()?,
+            }),
+        })
     }
 
     #[inline]

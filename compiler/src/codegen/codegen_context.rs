@@ -1,5 +1,5 @@
 use crate::parser::nodes::Expression;
-use crate::parser::nodes::{Function, Program, Prototype};
+use crate::parser::nodes::{Function, Prototype};
 use inkwell::builder::Builder;
 use inkwell::context::Context;
 use inkwell::module::Module;
@@ -13,7 +13,7 @@ use inkwell::{
 };
 use std::collections::HashMap;
 
-struct CodegenContext<'ctx> {
+pub struct CodegenContext<'ctx> {
     context: &'ctx Context,
     module: Module<'ctx>,
     builder: Builder<'ctx>,
@@ -32,7 +32,7 @@ impl<'ctx> CodegenContext<'ctx> {
 
     /// Generate code of an expression
     /// All expressions have return value of float
-    fn compile_expr(&self, expr: &Expression) -> Result<FloatValue<'ctx>, String> {
+    pub fn compile_expr(&self, expr: &Expression) -> Result<FloatValue<'ctx>, String> {
         match expr {
             Expression::NumberExpr(num) => Ok(self.context.f64_type().const_float(*num)),
             Expression::VariableExpr(ref var) => self
@@ -113,7 +113,7 @@ impl<'ctx> CodegenContext<'ctx> {
     }
 
     /// Generate code of proto, convert a function prototype to a FunctionValue
-    fn compile_proto(&self, proto: &Prototype) -> Result<FunctionValue<'ctx>, String> {
+    pub fn compile_proto(&self, proto: &Prototype) -> Result<FunctionValue<'ctx>, String> {
         let ret_type = self.context.f64_type();
         let arg_types: Vec<BasicTypeEnum> = vec![ret_type.into(); proto.args.len()];
         let arg_types_slice = arg_types.as_slice();
@@ -130,7 +130,11 @@ impl<'ctx> CodegenContext<'ctx> {
     }
 
     /// Creates a new stack allocation instruction
-    fn create_entry_block_alloca(&self, fun_val: &FunctionValue, name: &str) -> PointerValue<'ctx> {
+    pub fn create_entry_block_alloca(
+        &self,
+        fun_val: &FunctionValue,
+        name: &str,
+    ) -> PointerValue<'ctx> {
         let builder = self.context.create_builder();
 
         let entry = fun_val.get_first_basic_block().unwrap();
@@ -143,7 +147,7 @@ impl<'ctx> CodegenContext<'ctx> {
         builder.build_alloca(self.context.f64_type(), name)
     }
 
-    fn compile_func(&mut self, func: &Function) -> Result<FunctionValue, String> {
+    pub fn compile_func(&mut self, func: &Function) -> Result<FunctionValue, String> {
         // if the FunctionValue does not exist, compile it.
         let fun_val = match self.module.get_function(&func.prototype.name) {
             Some(func) => func,
@@ -179,6 +183,10 @@ impl<'ctx> CodegenContext<'ctx> {
             ))
         }
     }
+}
+
+pub fn create_inkwell_context() -> Context {
+    return Context::create();
 }
 
 #[cfg(test)]

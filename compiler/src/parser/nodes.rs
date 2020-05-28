@@ -1,7 +1,7 @@
-pub type Program = Vec<ASTNode>;
-
 #[derive(Debug)]
 pub enum ASTNode {
+    EOF,
+    Delimiter,
     ExternNode(Prototype),
     FunctionNode(Function),
 }

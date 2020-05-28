@@ -5,10 +5,17 @@ pub struct Buffer<I, T: Iterator<Item = I>> {
 }
 
 impl<I, T: Iterator<Item = I>> Buffer<I, T> {
-    pub fn new(mut iter: T) -> Self {
-        let curr = iter.next();
-        let next = iter.next();
-        Buffer { iter, curr, next }
+    pub fn new(iter: T) -> Self {
+        Buffer {
+            iter,
+            curr: None,
+            next: None,
+        }
+    }
+
+    pub fn init(&mut self) {
+        self.curr = self.iter.next();
+        self.next = self.iter.next();
     }
 
     pub fn curr(&self) -> Option<&I> {
@@ -36,6 +43,7 @@ mod tests {
     #[test]
     fn string_test() {
         let mut buffer = Buffer::new("123".chars());
+        buffer.init();
 
         assert_eq!(buffer.curr(), Some(&'1'));
         assert_eq!(buffer.curr(), Some(&'1'));
@@ -55,6 +63,7 @@ mod tests {
     #[test]
     fn short_string_test() {
         let mut buffer = Buffer::new("12".chars());
+        buffer.init();
 
         assert_eq!(buffer.curr(), Some(&'1'));
         assert_eq!(buffer.curr(), Some(&'1'));
