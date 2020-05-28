@@ -5,10 +5,10 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "(gdb) Launch",
+            "name": "(lldb) Debug repl",
             "type": "lldb",
             "request": "launch",
-            "program": "${workspaceFolder}/target/debug/kaleidoscope_rust_core-1a9d4a009cb7044f",
+            "program": "${workspaceFolder}/target/debug/repl",
             "args": [],
             "cwd": "${workspaceFolder}",
         }
