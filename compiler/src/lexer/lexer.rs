@@ -18,9 +18,9 @@ pub type LexerResult = Result<Token, LexerError>;
 
 impl<I: Iterator<Item = char>> Lexer<I> {
     pub fn new(char_iter: I) -> Self {
-        let mut buffer = Buffer::new(char_iter);
-        buffer.init();
-        Lexer { buffer }
+        Lexer {
+            buffer: Buffer::new(char_iter),
+        }
     }
 }
 
